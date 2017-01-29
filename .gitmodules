@@ -1,0 +1,9 @@
+[submodule "Adafruit_NeoPixel"]
+	path = Adafruit_NeoPixel
+	url = https://github.com/adafruit/Adafruit_NeoPixel.git
+[submodule "ResponsiveAnalogRead"]
+	path = ResponsiveAnalogRead
+	url = https://github.com/dxinteractive/ResponsiveAnalogRead.git
+[submodule "Timer"]
+	path = Timer
+	url = https://github.com/JChristensen/Timer.git
