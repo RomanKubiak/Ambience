@@ -7,3 +7,6 @@
 [submodule "Timer"]
 	path = Timer
 	url = https://github.com/JChristensen/Timer.git
+[submodule "pushbutton-arduino"]
+	path = pushbutton-arduino
+	url = https://github.com/pololu/pushbutton-arduino.git

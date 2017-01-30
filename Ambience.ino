@@ -1,10 +1,16 @@
+#include <Pushbutton.h>
 #include <EEPROM.h>
 #include <ResponsiveAnalogRead.h>
 #include <Event.h>
 #include <Timer.h>
 #include <Adafruit_NeoPixel.h>
 //Ambience.ino
-#define SET_BUTTON_PIN 6
+#define COLOR_ENABLE_BUTTON_PIN 	6
+#define SELECT_STRIP_BUTTON_PIN 	7
+#define ACTIVE_STRIPS 1
+
+Pushbutton colorEnableBtn(COLOR_ENABLE_BUTTON_PIN);
+Pushbutton selectStripBtn(SELECT_STRIP_BUTTON_PIN);
 
 ResponsiveAnalogRead anal0(A0, false);
 ResponsiveAnalogRead anal1(A1, false);
@@ -13,7 +19,13 @@ Timer t;
 byte r,g,b;
 unsigned long storedCRC = -1;
 
+byte currentStripSelected = 0;
 bool updateStrip[4] = { false, false, false, false };
+
+struct _stripBlinkState {
+	int count = -1;
+	byte num = 0;
+} stripBlinkState;
 
 struct stripState {
 	byte r = 0;
@@ -42,10 +54,6 @@ Adafruit_NeoPixel neoStrip[4] = {
 
 void setup() {
   Serial.begin(9600);
-  Serial.println("Ambience start");
-  
-  pinMode(SET_BUTTON_PIN, INPUT); 
-  digitalWrite(SET_BUTTON_PIN, HIGH);
 
   for (int strip=0; strip<4; strip++)
   {
@@ -70,6 +78,7 @@ void setup() {
   }
 
   t.every(25, timerCallback);
+  t.every(200, stripBlinkCallback);
 }
 
 void loop() {
@@ -78,6 +87,18 @@ void loop() {
   	anal0.update();
   	anal1.update();
   	anal2.update();
+  if (selectStripBtn.getSingleDebouncedRelease())
+  {
+  	Serial.print ("Change selected strip to: ");
+  	Serial.println(currentStripSelected);
+  	blinkStrip(currentStripSelected);
+
+  	currentStripSelected++;
+
+  	if (currentStripSelected == 4)
+  		currentStripSelected = 0;
+
+  }
 }
 
 unsigned long eeprom_crc(int start, int end) {
@@ -99,49 +120,75 @@ unsigned long eeprom_crc(int start, int end) {
   return crc;
 }
 
+void blinkStrip(const byte stripToBlink)
+{
+	if (stripToBlink >= 0 && stripToBlink < ACTIVE_STRIPS)
+	{
+		stripBlinkState.count = 4;
+		stripBlinkState.num = stripToBlink;
+	}
+}
+
+void stripBlinkCallback()
+{
+	// check strip blinking
+	if (stripBlinkState.count > 0)
+	{
+		Serial.print("__blink strip: "); Serial.print(stripBlinkState.num);
+		Serial.print(", count=="); Serial.println(stripBlinkState.count % 2);
+		neoStrip[stripBlinkState.num].setBrightness((stripBlinkState.count % 2) ? 200 : 18);
+		neoStrip[stripBlinkState.num].show();
+		stripBlinkState.count--;
+
+		if (stripBlinkState.count == 0)
+		{
+			Serial.println ("Blink ended");
+			neoStrip[stripBlinkState.num].setBrightness(255);
+			neoStrip[stripBlinkState.num].show();
+		}
+	}
+}
+
 void timerCallback()
 {
-	if (digitalRead(SET_BUTTON_PIN) == HIGH)
+	if (colorEnableBtn.isPressed() == false)
 		return;
 
 	if(anal0.hasChanged()) {
 		r = anal0.getValue() / 4;
-		updateStrip[0] = true;
+		updateStrip[currentStripSelected] = true;
 	}
 
 	if(anal1.hasChanged()) {
 		g = anal1.getValue() / 4;
-		updateStrip[0] = true;
+		updateStrip[currentStripSelected] = true;
 	}
 
 	if(anal2.hasChanged()) {
 		b = anal2.getValue() / 4;
-		updateStrip[0] = true;
+		updateStrip[currentStripSelected] = true;
 	}
 
-	for (int strip=0; strip<4; strip++)
-	{
-		if (updateStrip[strip] == true) {
-			for (int pixel=0; pixel<pixelsInStrip[strip]; pixel++)
-				neoStrip[strip].setPixelColor(pixel, neoStrip[strip].Color(r,g,b));
+	if (updateStrip[currentStripSelected] == true) {
+		for (int pixel=0; pixel<pixelsInStrip[currentStripSelected]; pixel++)
+			neoStrip[currentStripSelected].setPixelColor(pixel, neoStrip[currentStripSelected].Color(r,g,b));
 
-			Serial.print(r); Serial.print(",");
-			Serial.print(g); Serial.print(",");
-			Serial.print(b); Serial.print(",");
-			Serial.println("");
-			Serial.println("-----");
-			Serial.println("");
+		Serial.print(r); Serial.print(",");
+		Serial.print(g); Serial.print(",");
+		Serial.print(b); Serial.print(",");
+		Serial.println("");
+		Serial.println("-----");
+		Serial.println("");
 
-			neoStrip[strip].show();
+		neoStrip[currentStripSelected].show();
 
-			allStrips.strip[strip].r = r;
-			allStrips.strip[strip].g = g;
-			allStrips.strip[strip].b = b;
+		allStrips.strip[currentStripSelected].r = r;
+		allStrips.strip[currentStripSelected].g = g;
+		allStrips.strip[currentStripSelected].b = b;
 
-			EEPROM.put(0, allStrips);
-			EEPROM.put(sizeof(stripsState), eeprom_crc(0, sizeof(stripsState)));
-		}
-
-		updateStrip[strip] = false;
+		EEPROM.put(0, allStrips);
+		EEPROM.put(sizeof(stripsState), eeprom_crc(0, sizeof(stripsState)));
 	}
+
+	updateStrip[currentStripSelected] = false;
 }
