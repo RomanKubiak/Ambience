@@ -10,3 +10,6 @@
 [submodule "pushbutton-arduino"]
 	path = pushbutton-arduino
 	url = https://github.com/pololu/pushbutton-arduino.git
+[submodule "FastLED"]
+	path = FastLED
+	url = https://github.com/FastLED/FastLED.git
